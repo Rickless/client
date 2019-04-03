@@ -73,6 +73,31 @@ enum class PinState {
     Unspecified = 3,
 };
 
+/** A user-facing version of PinState.
+ *
+ * PinStates communicate availability intent for an item, but particular
+ * situations can get complex: An AlwaysLocal folder can have OnlineOnly
+ * files or directories.
+ *
+ * For users this is condensed to a few useful cases.
+ */
+enum class VfsItemAvailability {
+    /** The item is neither fully AlwaysLocal nor fully OnlineOnly. */
+    Mixed,
+
+    /** The item and all its subitems are AlwaysLocal.
+     *
+     * This guarantees that all contents will be kept in sync.
+     */
+    AlwaysLocal,
+
+    /** The item and all its subitems are OnlineOnly.
+     *
+     * This guarantees that contents will not take up space.
+     */
+    OnlineOnly,
+};
+
 }
 
 #endif

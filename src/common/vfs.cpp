@@ -79,6 +79,11 @@ Optional<PinState> Vfs::pinStateInDb(const QString &folderPath)
     return _setupParams.journal->internalPinStates().effectiveForPath(folderPath.toUtf8());
 }
 
+Optional<VfsItemAvailability> Vfs::availabilityInDb(const QString &folderPath)
+{
+    return _setupParams.journal->internalPinStates().availabilityForPath(folderPath.toUtf8());
+}
+
 VfsOff::VfsOff(QObject *parent)
     : Vfs(parent)
 {

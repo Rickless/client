@@ -296,6 +296,19 @@ public:
         Optional<PinState> effectiveForPath(const QByteArray &path);
 
         /**
+         * Computes availability based on path's pin states.
+         *
+         * Looks at the path's effective pin state and the sub-item's states
+         * to determine whether the path fits any of the VfsItemAvailability
+         * categories.
+         *
+         * It's valid to use the root path "".
+         *
+         * Returns none on db error.
+         */
+        Optional<VfsItemAvailability> availabilityForPath(const QByteArray &path);
+
+        /**
          * Sets a path's pin state.
          *
          * The path should not have a trailing slash.
@@ -396,6 +409,7 @@ private:
     SqlQuery _deleteConflictRecordQuery;
     SqlQuery _getRawPinStateQuery;
     SqlQuery _getEffectivePinStateQuery;
+    SqlQuery _getAvailabilityStateQuery;
     SqlQuery _setPinStateQuery;
     SqlQuery _wipePinStateQuery;
 

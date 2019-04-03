@@ -51,6 +51,8 @@ public:
     { return setPinStateInDb(folderPath, state); }
     Optional<PinState> pinState(const QString &folderPath) override
     { return pinStateInDb(folderPath); }
+    Optional<VfsItemAvailability> availability(const QString &folderPath) override
+    { return availabilityInDb(folderPath); }
 
 public slots:
     void fileStatusChanged(const QString &, SyncFileStatus) override {}

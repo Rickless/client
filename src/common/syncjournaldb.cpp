@@ -2084,7 +2084,7 @@ Optional<PinState> SyncJournalDb::PinStateInterface::effectiveForPath(const QByt
             // (it'd be great if paths started with a / and "/" could be the root)
             " (" IS_PREFIX_PATH_OR_EQUAL("path", "?1") " OR path == '')"
             " AND pinState is not null AND pinState != 0"
-            " ORDER BY length(path) DESC;"),
+            " ORDER BY length(path) DESC LIMIT 1;"),
         _db->_db));
     query.bindValue(1, path);
     query.exec();
@@ -2097,6 +2097,51 @@ Optional<PinState> SyncJournalDb::PinStateInterface::effectiveForPath(const QByt
         return PinState::AlwaysLocal;
 
     return static_cast<PinState>(query.intValue(0));
+}
+
+Optional<VfsItemAvailability> SyncJournalDb::PinStateInterface::availabilityForPath(const QByteArray &path)
+{
+    // Get the item's effective pin state. We'll compare subitem's pin states
+    // against this.
+    const auto basePin = effectiveForPath(path);
+    if (!basePin)
+        return {};
+
+    QMutexLocker lock(&_db->_mutex);
+    if (!_db->checkConnect())
+        return {};
+
+    // Find all the non-inherited pin states below the item
+    auto &query = _db->_getAvailabilityStateQuery;
+    ASSERT(query.initOrReset(QByteArrayLiteral(
+            "SELECT DISTINCT pinState FROM flags WHERE"
+            " (" IS_PREFIX_PATH_OF("?1", "path") " OR ?1 == '')"
+            " AND pinState is not null and pinState != 0;"),
+        _db->_db));
+    query.bindValue(1, path);
+    query.exec();
+
+    // Check if they are all identical
+    forever {
+        auto next = query.next();
+        if (!next.ok)
+            return {};
+        if (!next.hasData)
+            break;
+        const auto subPin = static_cast<PinState>(query.intValue(0));
+        if (subPin != *basePin)
+            return VfsItemAvailability::Mixed;
+    }
+
+    switch (*basePin)
+    {
+    case PinState::AlwaysLocal:
+        return VfsItemAvailability::AlwaysLocal;
+    case PinState::OnlineOnly:
+        return VfsItemAvailability::OnlineOnly;
+    default:
+        return VfsItemAvailability::Mixed;
+    }
 }
 
 void SyncJournalDb::PinStateInterface::setForPath(const QByteArray &path, PinState state)

@@ -946,30 +946,24 @@ void SocketApi::command_GET_MENU_ITEMS(const QString &argument, OCC::SocketListe
     if (folder
         && folder->supportsVirtualFiles()
         && folder->vfs().socketApiPinStateActionsShown()) {
-        bool hasAlwaysLocal = false;
-        bool hasOnlineOnly = false;
-        bool hasHydratedOnlineOnly = false;
-        bool hasDehydratedOnlineOnly = false;
+        // Determine the combined availability status of the files
+        auto combined = VfsItemAvailability::Mixed;
+        bool firstFile = true;
         for (const auto &file : files) {
             auto fileData = FileData::get(file);
             auto path = fileData.folderRelativePathNoVfsSuffix();
-            auto pinState = folder->vfs().pinState(path);
-            if (!pinState) {
-                // db error
-                hasAlwaysLocal = true;
-                hasOnlineOnly = true;
-            } else if (*pinState == PinState::AlwaysLocal) {
-                hasAlwaysLocal = true;
-            } else if (*pinState == PinState::OnlineOnly) {
-                hasOnlineOnly = true;
-                auto record = fileData.journalRecord();
-                if (record._type == ItemTypeFile)
-                    hasHydratedOnlineOnly = true;
-                if (record.isVirtualFile())
-                    hasDehydratedOnlineOnly = true;
+            auto availability = folder->vfs().availability(path);
+            if (!availability)
+                availability = VfsItemAvailability::Mixed; // db error
+            if (firstFile) {
+                combined = *availability;
+                firstFile = false;
+            } else if (*availability != combined) {
+                combined = VfsItemAvailability::Mixed;
             }
         }
 
+        // TODO: Should be a submenu, should use menu item checkmarks where available, should use icons
         auto makePinContextMenu = [listener](QString currentState, QString availableLocally, QString onlineOnly) {
             listener->sendMessage(QLatin1String("MENU_ITEM:CURRENT_PIN:d:") + currentState);
             if (!availableLocally.isEmpty())
@@ -978,36 +972,25 @@ void SocketApi::command_GET_MENU_ITEMS(const QString &argument, OCC::SocketListe
                 listener->sendMessage(QLatin1String("MENU_ITEM:MAKE_ONLINE_ONLY::") + onlineOnly);
         };
 
-        // TODO: Should be a submenu, should use menu item checkmarks where available, should use icons
-        if (hasAlwaysLocal) {
-            if (!hasOnlineOnly) {
-                makePinContextMenu(
-                    tr("Currently available locally"),
-                    QString(),
-                    tr("Make available online only"));
-            } else { // local + online
-                makePinContextMenu(
-                    tr("Current availability is mixed"),
-                    tr("Make all available locally"),
-                    tr("Make all available online only"));
-            }
-        } else if (hasOnlineOnly) {
-            if (hasDehydratedOnlineOnly && !hasHydratedOnlineOnly) {
-                makePinContextMenu(
-                    tr("Currently available online only"),
-                    tr("Make available locally"),
-                    QString());
-            } else if (hasHydratedOnlineOnly && !hasDehydratedOnlineOnly) {
-                makePinContextMenu(
-                    tr("Currently available, but marked online only"),
-                    tr("Make available locally"),
-                    tr("Make available online only"));
-            } else { // hydrated + dehydrated
-                makePinContextMenu(
-                    tr("Some currently available, all marked online only"),
-                    tr("Make available locally"),
-                    tr("Make available online only"));
-            }
+        switch (combined) {
+        case VfsItemAvailability::Mixed:
+            makePinContextMenu(
+                tr("Current availability is mixed"),
+                tr("Make all available locally"),
+                tr("Make all available online only"));
+            break;
+        case VfsItemAvailability::OnlineOnly:
+            makePinContextMenu(
+                tr("Currently available online only"),
+                tr("Make available locally"),
+                QString());
+            break;
+        case VfsItemAvailability::AlwaysLocal:
+            makePinContextMenu(
+                tr("Currently available locally"),
+                QString(),
+                tr("Make available online only"));
+            break;
         }
     }
 

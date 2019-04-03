@@ -340,14 +340,22 @@ void AccountSettings::slotCustomContextMenuRequested(const QPoint &pos)
 
     if (folder->supportsVirtualFiles()) {
         auto availabilityMenu = menu->addMenu(tr("Availability"));
+        auto availability = folder->vfs().availability(QString());
+        if (availability && *availability == VfsItemAvailability::Mixed) {
+            ac = availabilityMenu->addAction(tr("Mixed"));
+            ac->setCheckable(true);
+            ac->setChecked(true);
+            ac->setEnabled(false);
+        }
+
         ac = availabilityMenu->addAction(tr("Local"));
         ac->setCheckable(true);
-        ac->setChecked(!folder->newFilesAreVirtual());
+        ac->setChecked(availability && *availability == VfsItemAvailability::AlwaysLocal);
         connect(ac, &QAction::triggered, this, [this]() { slotSetCurrentFolderAvailability(PinState::AlwaysLocal); });
 
         ac = availabilityMenu->addAction(tr("Online only"));
         ac->setCheckable(true);
-        ac->setChecked(folder->newFilesAreVirtual());
+        ac->setChecked(availability && *availability == VfsItemAvailability::OnlineOnly);
         connect(ac, &QAction::triggered, this, [this]() { slotSetCurrentFolderAvailability(PinState::OnlineOnly); });
 
         ac = menu->addAction(tr("Disable virtual file support..."));
